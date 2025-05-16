@@ -223,7 +223,10 @@ input[type="number"], input[type="text"] {
         <div class="hero-content">
             <h1>Advanced Network Intrusion Detection</h1>
             <p>Protect your network with AI-powered threat detection</p>
-            <a href="/predict" class="cta-button">Detect Threats Now</a>
+            <div style="display: flex; gap: 1rem;">
+                <a href="/predict" class="cta-button">Detect Threats Now</a>
+                <a href="/packets" class="cta-button">Start Monitoring</a>
+            </div>
         </div>
         <div class="hero-image">    
         </div>
@@ -243,5 +246,17 @@ input[type="number"], input[type="text"] {
             <p>Identify various types of network attacks with precision</p>
         </div>
     </div>
+
+    <div class="container" style="text-align: center; margin-top: 2rem;">
+        <h1>Welcome to the DoS Detection System</h1>
+        <p>Click the button below to start monitoring for DoS attacks.</p>
+        <button id="start-monitoring" class="btn btn-primary" style="padding: 10px 20px; font-size: 1.2rem;">Start Monitoring</button>
+    </div>
+
+    <script>
+        document.getElementById('start-monitoring').addEventListener('click', function() {
+            window.location.href = '/packets';
+        });
+    </script>
 </body>
 </html>

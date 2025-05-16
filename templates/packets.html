@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Network Packet Monitor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #3498db;
+            --warning-color: #e74c3c;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-top: 20px;
+        }
+
+        .navbar {
+            background-color: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            color: white !important;
+            font-weight: 600;
+            font-size: 1.4rem;
+        }
+
+        .stats-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            padding: 20px;
+            transition: transform 0.2s;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .table {
+            margin-bottom: 0;
+        }
+
+        .table thead th {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+        }
+
+        .packet-details {
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        
+        .detail-badge {
+            font-size: 0.8rem;
+            margin-right: 5px;
+            margin-bottom: 3px;
+            display: inline-block;
+        }
+        
+        .timestamp {
+            color: #666;
+            font-family: monospace;
+        }
+        
+        .expandable-row {
+            cursor: pointer;
+        }
+        
+        .expanded-content {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .flag-badge {
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            margin-right: 3px;
+        }
+
+        .threat-level {
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 10px 15px;
+            border-radius: 5px;
+            color: white;
+            text-align: center;
+            transition: background-color 0.5s;
+        }
+
+        .threat-level.normal {
+            background-color: #2ecc71;
+        }
+
+        .threat-level.warning {
+            background-color: #f39c12;
+        }
+
+        .threat-level.danger {
+            background-color: #e74c3c;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .progress-dos {
+            height: 10px;
+        }
+
+        #dos-alert {
+            display: none;
+            margin-top: 15px;
+        }
+
+        .refresh-text {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-network-wired me-2"></i>
+                Network Packet Monitor
+            </a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="card-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h5>Total Packets</h5>
+                    <h3 id="total-packets">0</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="card-icon">
+                        <i class="fas fa-upload"></i>
+                    </div>
+                    <h5>Unique Sources</h5>
+                    <h3 id="unique-sources">0</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="card-icon">
+                        <i class="fas fa-download"></i>
+                    </div>
+                    <h5>Unique Destinations</h5>
+                    <h3 id="unique-destinations">0</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="card-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h5>Total Data</h5>
+                    <h3 id="total-bytes">0 B</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- DoS Detection Status Card -->
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="mb-0">DoS Attack Detection</h4>
+                        <span id="detection-timestamp" class="refresh-text">Last updated: Never</span>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div id="threat-level" class="threat-level normal">
+                                <i class="fas fa-check-circle me-2"></i> Normal Traffic
+                            </div>
+                            <div class="mt-3">
+                                <h6>Attack Probability</h6>
+                                <div class="progress progress-dos">
+                                    <div id="dos-probability-bar" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <small>0%</small>
+                                    <small>50%</small>
+                                    <small>100%</small>
+                                </div>
+                            </div>
+                            <div id="dos-metrics" class="mt-2">
+                                <small class="text-muted">Batch analysis of last 10 packets</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Detection Score</h6>
+                                    <h1 id="dos-probability-value" class="display-4 text-center">0%</h1>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="dos-alert" class="alert alert-danger mt-3" style="display: none;">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>DoS Attack Detected!</strong> Unusual traffic patterns detected in the last packet batch.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0">Live Packet Data</h4>
+                <span class="refresh-text" id="last-refresh">Last updated 0 seconds ago</span>
+            </div>
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Source</th>
+                        <th>Destination</th>
+                        <th>Protocol</th>
+                        <th>Size</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="packet-tbody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function formatTCPFlags(flags) {
+            if (!flags) return 'N/A';
+            const flagsArray = flags.split(' ');
+            return flagsArray.map(flag => 
+                `<span class="flag-badge badge bg-warning text-dark">${flag}</span>`
+            ).join(' ');
+        }
+
+        function getProtocolClass(protocol) {
+            const protocolClasses = {
+                'TCP': 'bg-info',
+                'UDP': 'bg-success',
+                'DNS': 'bg-warning',
+                'HTTP': 'bg-primary',
+                'HTTPS': 'bg-primary',
+                'ICMP': 'bg-danger',
+                'default': 'bg-secondary'
+            };
+            return protocolClasses[protocol] || protocolClasses.default;
+        }
+
+        function formatProtocolSpecificInfo(pkt) {
+            let info = '';
+            
+            // TCP Information
+            if (pkt.tcp_flags) {
+                info += `
+                    <h6>TCP Information</h6>
+                    <div class="mb-2">
+                        <span class="detail-badge badge bg-light text-dark">Window Size: ${pkt.tcp_window_size}</span>
+                        <span class="detail-badge badge bg-light text-dark">Sequence: ${pkt.tcp_seq}</span>
+                        <span class="detail-badge badge bg-light text-dark">ACK: ${pkt.tcp_ack}</span>
+                    </div>
+                    <h6>TCP Flags</h6>
+                    <div class="mb-2">
+                        ${formatTCPFlags(pkt.tcp_flags)}
+                    </div>
+                `;
+            }
+            
+            // UDP Information
+            if (pkt.udp_length) {
+                info += `
+                    <h6>UDP Information</h6>
+                    <div class="mb-2">
+                        <span class="detail-badge badge bg-light text-dark">UDP Length: ${pkt.udp_length}</span>
+                    </div>
+                `;
+            }
+            
+            // DNS Information
+            if (pkt.dns_info) {
+                info += `
+                    <h6>DNS Information</h6>
+                    <div class="mb-2">
+                        <span class="detail-badge badge bg-light text-dark">Query Name: ${pkt.dns_info.qry_name}</span>
+                        <span class="detail-badge badge bg-light text-dark">Query Type: ${pkt.dns_info.qry_type}</span>
+                    </div>
+                `;
+            }
+            
+            // HTTP Information
+            if (pkt.http_info) {
+                info += `
+                    <h6>HTTP Information</h6>
+                    <div class="mb-2">
+                        <span class="detail-badge badge bg-light text-dark">Method: ${pkt.http_info.method}</span>
+                        <span class="detail-badge badge bg-light text-dark">Host: ${pkt.http_info.host}</span>
+                        <span class="detail-badge badge bg-light text-dark">URI: ${pkt.http_info.uri}</span>
+                    </div>
+                `;
+            }
+            
+            return info || '<div class="mb-2">No additional protocol information available</div>';
+        }
+
+        function formatBytes(bytes) {
+            if (bytes < 1024) return bytes + " B";
+            else if (bytes < 1048576) return (bytes / 1024).toFixed(2) + " KB";
+            else return (bytes / 1048576).toFixed(2) + " MB";
+        }
+
+        function toggleDetails(index) {
+            const detailsRow = document.getElementById(`details-${index}`);
+            detailsRow.classList.toggle('d-none');
+        }
+
+        function updateStats(data) {
+            document.getElementById('total-packets').textContent = data.length;
+            document.getElementById('unique-sources').textContent = 
+                new Set(data.map(pkt => pkt.src)).size;
+            document.getElementById('unique-destinations').textContent = 
+                new Set(data.map(pkt => pkt.dst)).size;
+            
+            const totalBytes = data.reduce((sum, pkt) => sum + parseInt(pkt.length), 0);
+            document.getElementById('total-bytes').textContent = formatBytes(totalBytes);
+        }
+
+        function updateRefreshTime() {
+            const now = new Date();
+            document.getElementById('last-refresh').textContent = 
+                `Last updated ${now.toLocaleTimeString()}`;
+        }
+
+        function updateDoSStatus() {
+            fetch('/dos-prediction')
+                .then(response => response.json())
+                .then(data => {
+                    // Update timestamp
+                    document.getElementById('detection-timestamp').textContent = 
+                        `Last updated: ${data.timestamp}`;
+                    
+                    // Update probability value
+                    const probabilityPercent = (data.probability * 100).toFixed(2);
+                    document.getElementById('dos-probability-value').textContent = `${probabilityPercent}%`;
+                    
+                    // Update progress bar
+                    const progressBar = document.getElementById('dos-probability-bar');
+                    progressBar.style.width = `${probabilityPercent}%`;
+                    
+                    // Set progress bar color based on probability
+                    if (data.probability > 0.75) {
+                        progressBar.className = 'progress-bar bg-danger';
+                    } else if (data.probability > 0.5) {
+                        progressBar.className = 'progress-bar bg-warning';
+                    } else {
+                        progressBar.className = 'progress-bar bg-success';
+                    }
+                    
+                    // Update threat level indicator
+                    const threatLevel = document.getElementById('threat-level');
+                    if (data.is_attack) {
+                        threatLevel.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i> ${data.status}`;
+                        threatLevel.className = 'threat-level danger';
+                        document.getElementById('dos-alert').style.display = 'block';
+                    } else if (data.probability > 0.5) {
+                        threatLevel.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i> Suspicious Activity`;
+                        threatLevel.className = 'threat-level warning';
+                        document.getElementById('dos-alert').style.display = 'none';
+                    } else {
+                        threatLevel.innerHTML = `<i class="fas fa-check-circle me-2"></i> ${data.status}`;
+                        threatLevel.className = 'threat-level normal';
+                        document.getElementById('dos-alert').style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching DoS prediction:', error);
+                });
+        }
+
+        async function fetchPackets() {
+            try {
+                const res = await fetch('/packets-get');
+                const data = await res.json();
+                const tbody = document.getElementById('packet-tbody');
+                tbody.innerHTML = '';
+                
+                updateStats(data);
+                updateRefreshTime();
+                
+                data.forEach((pkt, index) => {
+                    const row = document.createElement('tr');
+                    row.className = 'expandable-row';
+                    
+                    const protocolClass = getProtocolClass(pkt.proto);
+                    
+                    row.innerHTML = `
+                        <td>
+                            <span class="timestamp">${pkt.timestamp}</span>
+                        </td>
+                        <td>
+                            <div class="badge bg-light text-dark">
+                                ${pkt.src}${pkt.src_port !== 'N/A' ? ':' + pkt.src_port : ''}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="badge bg-light text-dark">
+                                ${pkt.dst}${pkt.dst_port !== 'N/A' ? ':' + pkt.dst_port : ''}
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge ${protocolClass}">${pkt.proto}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">${pkt.length} bytes</span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="toggleDetails(${index})">
+                                Details
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+
+                    const detailsRow = document.createElement('tr');
+                    detailsRow.className = 'details-row d-none';
+                    detailsRow.id = `details-${index}`;
+                    detailsRow.innerHTML = `
+                        <td colspan="6">
+                            <div class="expanded-content">
+                                <h6>IP Information</h6>
+                                <div class="mb-2">
+                                    <span class="detail-badge badge bg-light text-dark">Version: ${pkt.ip_version}</span>
+                                    <span class="detail-badge badge bg-light text-dark">TTL: ${pkt.ttl}</span>
+                                    <span class="detail-badge badge bg-light text-dark">IP Flags: ${pkt.ip_flags || 'N/A'}</span>
+                                </div>
+                                
+                                ${formatProtocolSpecificInfo(pkt)}
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(detailsRow);
+                });
+            } catch (error) {
+                console.error('Error fetching packets:', error);
+            }
+        }
+
+        // Start the periodic updates
+        setInterval(fetchPackets, 1000);
+        setInterval(updateDoSStatus, 1000);
+        
+        // Initial fetch
+        fetchPackets();
+        updateDoSStatus();
+    </script>
+</body>
+</html>
